@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+VERSION="1.0.0"
+
+# Colors
+
+if [[ -t 1 ]]; then
+  reset='\033[0m'
+  bold='\033[1m'
+  dim='\033[2m'
+  green='\033[32m'
+  yellow='\033[33m'
+  red='\033[31m'
+  cyan='\033[36m'
+  blue='\033[0;34m'
+else
+  reset=''
+  bold=''
+  dim=''
+  green=''
+  yellow=''
+  red=''
+  cyan=''
+  blue=''
+fi
+
+# Configuration
+
+barWidth=40
+
+# Functions
+
+usage() {
+  cat <<EOF
+Usage:
+    progress <file>
+
+Description:
+    Analyze a TODO/checklist file and display completion progress.
+
+Recognized checkboxes:
+    [ ]    Incomplete
+    [*]    In progress
+    [x]    Completed
+    [X]    Completed
+
+Options:
+    -h, --help       Show this help message
+    -v, --version    Show version
+
+Examples:
+    progress todo.txt
+    ./progress todo.txt
+
+Version:
+    $VERSION
+EOF
+}
+
+error() {
+  printf "%bError:%b %s\n" "$red" "$reset" "$1" >&2
+  exit 1
+}
+
+# Generate a progress bar.
+
+draw_bar() {
+  local percentage="$1"
+  local filled=$((percentage * barWidth / 100))
+  local empty=$((barWidth - filled))
+
+  if ((filled > 0)); then
+    printf "%${filled}s" "" | tr ' ' '█'
+  fi
+
+  if ((empty > 0)); then
+    printf "%${empty}s" "" | tr ' ' '░'
+  fi
+
+}
+
+# Argument parsing
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 1
+fi
+
+file=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+
+  -v | --version)
+    printf '%s\n' "$VERSION"
+    exit 0
+    ;;
+
+  -*)
+    error "Unknown option: $1"
+
+    ;;
+
+  *)
+    if [[ -n "$file" ]]; then
+      error "Too many arguments."
+    fi
+
+    file="$1"
+    shift
+    ;;
+  esac
+done
+
+# Validate input
+
+[[ -n "$file" ]] || error "No input file specified."
+
+[[ -e "$file" ]] || error "File does not exist: $file"
+
+[[ -f "$file" ]] || error "Not a regular file: $file"
+
+[[ -r "$file" ]] || error "File is not readable: $file"
+
+# Count checkboxes
+#
+# We use awk instead of grep because awk allows
+# us to scan the file once and count everything.
+
+# [ ] = incomplete
+# [*] = in progress
+# [x] / [X] = completed
+
+read -r incomplete in_progress completed <<<"$(
+  awk '
+    {
+        line = $0
+
+        while (match(line, /\[[* xX]\]/)) { 
+            checkbox = substr(line, RSTART, RLENGTH)
+
+            if (checkbox == "[ ]")
+                incomplete++
+            else if (checkbox == "[*]")
+                in_progress++
+            else if (checkbox == "[x]" || checkbox == "[X]")
+                completed++
+
+            line = substr(line, RSTART + RLENGTH)
+        }
+    }
+
+    END {
+        printf "%d %d %d\n", incomplete + 0, in_progress + 0, completed + 0
+    }
+    ' "$file"
+)"
+
+# took me quite some time to get that regex right
+
+total=$((incomplete + in_progress + completed))
+
+# Calculate progress
+
+if ((total > 0)); then
+  percentage=$((completed * 100 / total))
+else
+  percentage=0
+fi
+
+# Display
+
+printf "\n"
+printf " %b%bTODO PROGRESS:%b\n" "$bold" "$cyan" "$reset"
+
+printf "\n"
+printf "  File: %s\n" "$file"
+printf "  Total tasks: %d\n" "$total"
+
+printf "\n"
+
+# Main progress bar
+printf "  %bProgress%b  " "$bold" "$reset"
+draw_bar "$percentage"
+printf "  %b%d%%%b\n" "$bold" "$percentage" "$reset"
+
+printf "\n"
+
+# Statistics
+printf "  %b%-15s%b %d\n" "$green" "Completed" "$reset" "$completed"
+printf "  %b%-15s%b %d\n" "$yellow" "In Progress" "$reset" "$in_progress"
+printf "  %b%-15s%b %d\n" "$red" "Incomplete" "$reset" "$incomplete"
+
+printf "\n"
+
+# Completion message
+
+if ((total == 0)); then
+  printf "  %bNo checklist items found.%b\n" "$dim" "$reset"
+elif ((percentage == 100)); then
+  printf "  %b✓ All tasks completed!%b\n" "$blue" "$reset"
+elif ((percentage >= 60)); then
+  printf "  %bAlmost there!%b\n" "$blue" "$reset"
+elif ((percentage >= 40)); then
+  printf "  %bMore than halfway there.%b\n" "$blue" "$reset"
+elif ((percentage > 0)); then
+  printf "  %bWe are just getting Started%b\n" "$blue" "$reset"
+else
+  printf "  %bNothing completed yet.%b\n" "$blue" "$reset"
+fi
+
+printf "\n"
