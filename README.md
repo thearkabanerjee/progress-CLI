@@ -40,7 +40,7 @@ Given a file like:
 - [*] Ask "what could possibly go wrong?"
 - [ ] Find out what could possibly go wrong```
 
-Run:
+### Run:
 
 ```bash
 progress todo.txt
