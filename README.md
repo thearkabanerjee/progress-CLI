@@ -3,7 +3,6 @@
 A CLI that analyzes checklist and displays task completion progress.
 
 ![screenshot](assets/screenshot.png)
-
 It scans your file for:
 
 - `[ ]` — incomplete tasks
