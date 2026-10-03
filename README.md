@@ -53,7 +53,7 @@ TODO PROGRESS
   File: todo.txt
   Total tasks: 9
 
-  Progress  [██████████████████████░░░░░░░░░░░░░░░░] 55%
+  Progress  ██████████████████████░░░░░░░░░░░░░░░░ 55%
 
   Completed       5
   In Progress     2
